@@ -21,6 +21,11 @@ class UserRequest extends Request
      */
     public function rules(): array
     {
+        // Only validate for POST, PUT, PATCH methods
+        if (!in_array($this->method(), ['POST', 'PUT', 'PATCH'])) {
+            return [];
+        }
+
         $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
