@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: user-microservice
+    container_name: user-microservice-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - user-microservice
+
+  webserver:
+    image: nginx:alpine
+    container_name: user-microservice-webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - user-microservice
+
+  db:
+    image: mysql:8.0
+    container_name: user-microservice-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: user_microservice
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: user
+      MYSQL_USER: user
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - user-microservice
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: user-microservice-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    networks:
+      - user-microservice
+
+volumes:
+  dbdata:
+    driver: local
+  rabbitmqdata:
+    driver: local
+
+networks:
+  user-microservice:
+    driver: bridge
