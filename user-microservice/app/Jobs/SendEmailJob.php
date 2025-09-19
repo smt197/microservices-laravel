@@ -56,12 +56,12 @@ class SendEmailJob implements ShouldQueue
             Log::info('Email sent successfully to: ' . $this->email);
 
             // Example of how you would send an actual email:
-            /*
+            
             Mail::raw($this->message, function ($mail) {
                 $mail->to($this->email)
                      ->subject($this->subject);
             });
-            */
+            
 
         } catch (\Exception $e) {
             Log::error('Failed to send email', [
