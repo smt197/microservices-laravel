@@ -26,17 +26,21 @@ class UserRequest extends Request
             return [];
         }
 
+        // Base rules for creation (POST)
         $rules = [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|email|max:255|unique:users,email',
             'password' => 'required|string|min:8',
         ];
 
-        // For updates, make password optional and email unique except for current user
+        // More lenient rules for updates (PUT/PATCH)
         if ($this->isMethod('patch') || $this->isMethod('put')) {
             $userId = $this->route('user');
-            $rules['email'] = 'required|string|email|max:255|unique:users,email,' . $userId;
-            $rules['password'] = 'sometimes|string|min:8';
+            $rules = [
+                'name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $userId,
+                'password' => 'sometimes|string|min:8',
+            ];
         }
 
         return $rules;

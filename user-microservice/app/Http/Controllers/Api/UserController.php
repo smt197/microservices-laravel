@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\User;
-use App\Jobs\SendEmailJob;
 use App\Http\Resources\UserResource;
 use App\Http\Requests\UserRequest;
 use Orion\Http\Controllers\Controller;
 use Orion\Concerns\DisablePagination;
 use Orion\Concerns\DisableAuthorization;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
@@ -63,22 +64,6 @@ class UserController extends Controller
     ];
 
     /**
-     * Perform actions after storing the entity.
-     */
-    protected function afterStore($request, $entity)
-    {
-        // Dispatch email job after user creation
-        $emailData = [
-            'to' => $entity->email,
-            'subject' => 'Welcome to User Microservice',
-            'body' => 'Your account has been successfully created.'
-        ];
-        SendEmailJob::dispatch($emailData);
-
-        return $entity;
-    }
-
-    /**
      * The attributes that are mass assignable.
      */
     protected function fillable(): array
@@ -88,5 +73,32 @@ class UserController extends Controller
             'email',
             'password',
         ];
+    }
+
+    public function validateCredentials(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
+
+        return new UserResource($user);
+    }
+
+    public function getUserByEmail(string $email)
+    {
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        return new UserResource($user);
     }
 }
