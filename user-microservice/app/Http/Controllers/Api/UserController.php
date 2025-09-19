@@ -68,11 +68,12 @@ class UserController extends Controller
     protected function afterStore($request, $entity)
     {
         // Dispatch email job after user creation
-        SendEmailJob::dispatch(
-            $entity->email,
-            'Welcome to User Microservice',
-            'Your account has been successfully created.'
-        );
+        $emailData = [
+            'to' => $entity->email,
+            'subject' => 'Welcome to User Microservice',
+            'body' => 'Your account has been successfully created.'
+        ];
+        SendEmailJob::dispatch($emailData);
 
         return $entity;
     }
