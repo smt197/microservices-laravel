@@ -3,10 +3,10 @@ version: '3.8'
 networks:
   send_email_network:
     driver: bridge
+  microservices_network:
+    external: true
 
 volumes:
-  rabbitmqdata:
-    driver: local
 
 services:
   # =================================================================
@@ -26,18 +26,17 @@ services:
       - ./:/var/www
     networks:
       - send_email_network
-    depends_on:
-      - rabbitmq
+      - microservices_network
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
       - APP_KEY=base64:JeJcjYE9eJf61A2GRy8c4MuBwKAUUFlHQ3VcINXlLNY=
       - APP_URL=http://localhost:8081
       - QUEUE_CONNECTION=rabbitmq
-      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_HOST=rabbitmq_server
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=admin
-      - RABBITMQ_PASSWORD=admin
+      - RABBITMQ_PASSWORD=password
       - RABBITMQ_VHOST=/
       - CACHE_DRIVER=file
       - SESSION_DRIVER=file
@@ -69,18 +68,3 @@ services:
   # INFRASTRUCTURE SERVICES
   # =================================================================
 
-  # File d'attente de messages
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: send-email-rabbitmq
-    restart: unless-stopped
-    environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin
-    ports:
-      - "15673:15672"  # Port différent pour éviter les conflits
-      - "5673:5672"    # Port différent pour éviter les conflits
-    volumes:
-      - rabbitmqdata:/var/lib/rabbitmq
-    networks:
-      - send_email_network

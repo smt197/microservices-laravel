@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendEmailJob;
+use App\Jobs\PublishUserEventJob;
 use App\Models\User;
+use App\Events\UserCreated;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -21,31 +25,29 @@ class AuthController extends Controller
 {
     public function register(RegisterRequest $request)
     {
-        $response = Http::post(env('USER_MICROSERVICE_URL') . '/api/users', [
+        // Create user in local auth database
+        $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
         ]);
 
-        if ($response->failed()) {
-            return response()->json(['message' => 'Failed to create user in user-microservice', 'error' => $response->body()], $response->status());
-        }
-
-        $user = $response->json()['data'];
+        // Publish user created event
+        PublishUserEventJob::dispatch('created', $user->toArray())->onQueue('events');
 
         // Generate verification URL
         $verificationUrl = URL::temporarySignedRoute(
             'verification.verify',
             now()->addMinutes(60),
             [
-                'id' => $user['id'],
-                'hash' => sha1($user['email']),
+                'id' => $user->id,
+                'hash' => sha1($user->email),
             ]
         );
 
         // Dispatch email job
         $emailData = [
-            'to' => $user['email'],
+            'to' => $user->email,
             'subject' => 'Verify Your Email Address',
             'body' => 'Please click the following link to verify your email: ' . $verificationUrl
         ];
@@ -53,37 +55,32 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully. Please check your email to verify your account.',
-            'user' => $user
+            'user' => $user->only(['id', 'name', 'email', 'created_at'])
         ], 201);
     }
 
     public function login(LoginRequest $request)
     {
-        // Call user-microservice to validate credentials
-        $response = Http::post(env('USER_MICROSERVICE_URL') . '/api/validate-credentials', [
-            'email' => $request->email,
-            'password' => $request->password,
-        ]);
-
-        if ($response->failed()) {
+        // Validate credentials locally
+        if (!Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $userData = $response->json()['data'];
+        $user = Auth::user();
 
         // Check if email is verified
-        if (empty($userData['email_verified_at'])) {
+        if (empty($user->email_verified_at)) {
             // Re-send verification email
             $verificationUrl = URL::temporarySignedRoute(
                 'verification.verify',
                 now()->addMinutes(60),
                 [
-                    'id' => $userData['id'],
-                    'hash' => sha1($userData['email']),
+                    'id' => $user->id,
+                    'hash' => sha1($user->email),
                 ]
             );
             $emailData = [
-                'to' => $userData['email'],
+                'to' => $user->email,
                 'subject' => 'Verify Your Email Address',
                 'body' => 'You must verify your email before logging in. Please click the link to verify: ' . $verificationUrl
             ];
@@ -91,12 +88,6 @@ class AuthController extends Controller
 
             return response()->json(['message' => 'Email not verified. A new verification link has been sent to your email address.'], 403);
         }
-
-        // Create a temporary user instance for token generation
-        $user = new User();
-        $user->id = $userData['id'];
-        $user->name = $userData['name'];
-        $user->email = $userData['email'];
 
         // Create Sanctum token
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -113,59 +104,38 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful',
-            'user' => $userData
+            'user' => $user->only(['id', 'name', 'email', 'email_verified_at'])
         ], 200)->withCookie($cookie);
     }
 
     public function verify(Request $request, $id, $hash)
     {
         try {
-            // 1. Fetch the user
-            $userResponse = Http::get(env('USER_MICROSERVICE_URL') . '/api/users/' . $id);
+            // Find user locally
+            $user = User::find($id);
 
-            // 2. Check for non-200 responses
-            if (!$userResponse->successful()) {
-                Log::error('Failed to fetch user from user-microservice', [
-                    'status' => $userResponse->status(),
-                    'body' => $userResponse->body()
-                ]);
-                return response()->json(['message' => 'Could not retrieve user information.'], 502); // 502 Bad Gateway is appropriate
+            if (!$user) {
+                return response()->json(['message' => 'User not found.'], 404);
             }
 
-            $user = $userResponse->json('data'); // Use the 'data' key, default to null if not found
-
-            // 3. Check if user data is valid
-            if (!$user || !isset($user['email'])) {
-                Log::error('User data from user-microservice is invalid.', ['user_data' => $user]);
-                return response()->json(['message' => 'Invalid user data received.'], 502);
-            }
-
-            // 4. Check hash
-            if (!hash_equals((string) $hash, sha1($user['email']))) {
+            // Check hash
+            if (!hash_equals((string) $hash, sha1($user->email))) {
                 return response()->json(['message' => 'Invalid verification link.'], 400);
             }
 
-            // 5. Check if already verified
-            if ($user['email_verified_at']) {
+            // Check if already verified
+            if ($user->email_verified_at) {
                 return response()->json(['message' => 'Email already verified.'], 400);
             }
 
-            // 6. Mark as verified
-            $patchResponse = Http::patch(env('USER_MICROSERVICE_URL') . '/api/users/' . $id, [
-                'email_verified_at' => Carbon::now(),
-            ]);
+            // Mark as verified locally
+            $user->update(['email_verified_at' => Carbon::now()]);
 
-            if (!$patchResponse->successful()) {
-                Log::error('Failed to update user in user-microservice', [
-                    'status' => $patchResponse->status(),
-                    'body' => $patchResponse->body()
-                ]);
-                return response()->json(['message' => 'Failed to finalize verification.'], 502);
-            }
+            // Publish user verified event
+            PublishUserEventJob::dispatch('verified', $user->toArray())->onQueue('events');
 
             return response()->json(['message' => 'Email successfully verified.']);
         } catch (\Exception $e) {
-            // Catch any other unexpected errors
             Log::error('An unexpected error occurred in email verification.', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -182,31 +152,29 @@ class AuthController extends Controller
             return response()->json(['message' => 'Password reset functionality is not configured.'], 500);
         }
 
-        // Fetch user from user-microservice
-        $userResponse = Http::get(env('USER_MICROSERVICE_URL') . '/api/users/email/' . $request->email);
+        // Find user locally
+        $user = User::where('email', $request->email)->first();
 
-        if (!$userResponse->successful()) {
+        if (!$user) {
             // For security, always return a generic success message even if user not found
             return response()->json(['message' => 'If your email address exists in our database, you will receive a password recovery link at your email address.'], 200);
         }
-
-        $user = $userResponse->json()['data'];
 
         // Generate token
         $token = Str::random(60);
 
         // Store token in database
         DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $user['email']],
-            ['token' => \Illuminate\Support\Facades\Hash::make($token), 'created_at' => Carbon::now()]
+            ['email' => $user->email],
+            ['token' => Hash::make($token), 'created_at' => Carbon::now()]
         );
 
         // Generate reset link (frontend URL)
-        $resetUrl = env('APP_URL') . '/reset-password?token=' . $token . '&email=' . $user['email']; // Assuming frontend handles this route
+        $resetUrl = env('APP_URL') . '/reset-password?token=' . $token . '&email=' . $user->email;
 
         // Dispatch email job
         $emailData = [
-            'to' => $user['email'],
+            'to' => $user->email,
             'subject' => 'Password Reset Request',
             'body' => 'You are receiving this email because we received a password reset request for your account.\n\n' .
                 'Please click the following link to reset your password: ' . $resetUrl . '\n\n' .
@@ -230,7 +198,7 @@ class AuthController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        if (!$tokenRecord || !\Illuminate\Support\Facades\Hash::check($request->token, $tokenRecord->token)) {
+        if (!$tokenRecord || !Hash::check($request->token, $tokenRecord->token)) {
             return response()->json(['message' => 'This password reset token is invalid.'], 400);
         }
 
@@ -241,27 +209,18 @@ class AuthController extends Controller
             return response()->json(['message' => 'This password reset token has expired.'], 400);
         }
 
-        // Fetch user from user-microservice by email
-        $userResponse = Http::get(env('USER_MICROSERVICE_URL') . '/api/users/email/' . $request->email);
+        // Find user locally
+        $user = User::where('email', $request->email)->first();
 
-        if (!$userResponse->successful()) {
+        if (!$user) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
-        $user = $userResponse->json()['data'];
+        // Update password locally
+        $user->update(['password' => $request->password]);
 
-        // Update password in user-microservice
-        $patchResponse = Http::patch(env('USER_MICROSERVICE_URL') . '/api/users/' . $user['id'], [
-            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
-        ]);
-
-        if (!$patchResponse->successful()) {
-            Log::error('Failed to update password in user-microservice', [
-                'status' => $patchResponse->status(),
-                'body' => $patchResponse->body()
-            ]);
-            return response()->json(['message' => 'Failed to reset password.'], 500);
-        }
+        // Publish user updated event
+        PublishUserEventJob::dispatch('updated', $user->toArray())->onQueue('events');
 
         // Delete the token after successful reset
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();

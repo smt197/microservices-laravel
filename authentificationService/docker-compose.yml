@@ -1,7 +1,7 @@
 version: '3.8'
 
 networks:
-  user_microservice_network:
+  auth_microservice_network:
     driver: bridge
   microservices_network:
     external: true
@@ -12,23 +12,23 @@ volumes:
 
 services:
   # =================================================================
-  # USER MICROSERVICE
+  # AUTHENTICATION MICROSERVICE
   # =================================================================
 
-  # Conteneur PHP-FPM pour le service utilisateur
-  user_app:
+  # Conteneur PHP-FPM pour le service d'authentification
+  auth_app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: user-microservice
-    container_name: user-microservice-app
+    image: auth-microservice
+    container_name: auth-microservice-app
     restart: unless-stopped
     working_dir: /var/www
     volumes:
       - ./:/var/www
       - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - user_microservice_network
+      - auth_microservice_network
       - microservices_network
     depends_on:
       - db
@@ -36,36 +36,36 @@ services:
       - APP_ENV=local
       - APP_DEBUG=true
       - APP_KEY=base64:Mxb7G//GzC9MYoJzjPg0pRNBGZXXLYTH6eZ1kbhFzzo=
-      - APP_URL=http://localhost:8080
+      - APP_URL=http://localhost:8081
       - DB_CONNECTION=mysql
       - DB_HOST=db
       - DB_PORT=3306
-      - DB_DATABASE=user_microservice
-      - DB_USERNAME=user
-      - DB_PASSWORD=user
+      - DB_DATABASE=auth_microservice
+      - DB_USERNAME=auth
+      - DB_PASSWORD=auth
       - QUEUE_CONNECTION=rabbitmq
       - RABBITMQ_HOST=rabbitmq_server
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=admin
       - RABBITMQ_PASSWORD=password
       - RABBITMQ_VHOST=/
-      - CACHE_DRIVER=file
+      - CACHE_DRIVER=file 
       - SESSION_DRIVER=file
 
-  # Conteneur Nginx pour le service utilisateur
-  user_webserver:
+  # Conteneur Nginx pour le service d'authentification
+  auth_webserver:
     image: nginx:alpine
-    container_name: user-microservice-webserver
+    container_name: auth-microservice-webserver
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8081:80"
     volumes:
       - ./:/var/www
       - ./nginx/conf.d/:/etc/nginx/conf.d/
     networks:
-      - user_microservice_network
+      - auth_microservice_network
     depends_on:
-      - user_app
+      - auth_app
 
   # =================================================================
   # INFRASTRUCTURE SERVICES
@@ -74,17 +74,17 @@ services:
   # Base de données MySQL
   db:
     image: mysql:8.0
-    container_name: user-microservice-db
+    container_name: auth-microservice-db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: user_microservice
+      MYSQL_DATABASE: auth_microservice
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_PASSWORD: user
-      MYSQL_USER: user
+      MYSQL_PASSWORD: auth
+      MYSQL_USER: auth
     volumes:
       - dbdata:/var/lib/mysql
     networks:
-      - user_microservice_network
+      - auth_microservice_network
     ports:
-      - "3306:3306"
+      - "3307:3306"
 
