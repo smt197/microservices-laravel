@@ -1,89 +1,68 @@
 version: '3.8'
 
 networks:
-  user_microservice_network:
+  send_email_network:
     driver: bridge
 
 volumes:
-  dbdata:
-    driver: local
   rabbitmqdata:
     driver: local
 
 services:
   # =================================================================
-  # USER MICROSERVICE
+  # SEND EMAIL SERVICE
   # =================================================================
 
-  # Conteneur PHP-FPM pour le service utilisateur
-  user_app:
+  # Conteneur PHP-FPM pour le service d'envoi d'e-mails
+  send_email_app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: user-microservice
-    container_name: user-microservice-app
+    image: send-email-service
+    container_name: send-email-app
     restart: unless-stopped
     working_dir: /var/www
     volumes:
       - ./:/var/www
-      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - user_microservice_network
+      - send_email_network
     depends_on:
-      - db
       - rabbitmq
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
 
-  # Conteneur Nginx pour le service utilisateur
-  user_webserver:
+  # Conteneur Nginx pour le service d'envoi d'e-mails
+  send_email_webserver:
     image: nginx:alpine
-    container_name: user-microservice-webserver
+    container_name: send-email-webserver
     restart: unless-stopped
     ports:
-      - "8000:80"
+      - "8001:80"
     volumes:
       - ./:/var/www
       - ./nginx/conf.d/:/etc/nginx/conf.d/
     networks:
-      - user_microservice_network
+      - send_email_network
     depends_on:
-      - user_app
+      - send_email_app
 
   # =================================================================
   # INFRASTRUCTURE SERVICES
   # =================================================================
 
-  # Base de données MySQL
-  db:
-    image: mysql:8.0
-    container_name: user-microservice-db
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: user_microservice
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_PASSWORD: user
-      MYSQL_USER: user
-    volumes:
-      - dbdata:/var/lib/mysql
-    networks:
-      - user_microservice_network
-    ports:
-      - "3306:3306"
-
   # File d'attente de messages
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: user-microservice-rabbitmq
+    container_name: send-email-rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - "15673:15672"  # Port différent pour éviter les conflits
+      - "5673:5672"    # Port différent pour éviter les conflits
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
     networks:
-      - user_microservice_network
+      - send_email_network

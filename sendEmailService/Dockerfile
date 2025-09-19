@@ -16,9 +16,7 @@ RUN apk add --no-cache \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Create system user to run Composer and Artisan Commands
-RUN useradd -G www-data,root -u 1000 -d /home/www-data www-data
-RUN mkdir -p /home/www-data/.composer && \
-    chown -R www-data:www-data /home/www-data
+RUN adduser -G www-data -s /bin/sh -D www-data
 
 # Set working directory
 WORKDIR /var/www

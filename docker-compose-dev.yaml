@@ -1,0 +1,129 @@
+version: '3.8'
+
+# =================================================================
+# RÉSEAU PARTAGÉ
+# Un seul réseau pour que tous les microservices puissent communiquer.
+# =================================================================
+networks:
+  microservices_network:
+    driver: bridge
+
+# =================================================================
+# VOLUMES PERSISTANTS
+# Pour conserver les données de la base de données et de RabbitMQ.
+# =================================================================
+volumes:
+  dbdata:
+    driver: local
+  rabbitmqdata:
+    driver: local
+
+services:
+  # =================================================================
+  # MICROSERVICE 1 : USER SERVICE
+  # =================================================================
+
+  # Conteneur PHP-FPM pour le service utilisateur
+  user_service_app:
+    build:
+      context: ./user-microservice # Chemin vers le contexte de build
+      dockerfile: Dockerfile
+    image: user-service
+    container_name: user-service-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./user-microservice/:/var/www
+      - ./user-microservice/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - microservices_network
+    depends_on:
+      - db
+      - rabbitmq
+
+  # Conteneur Nginx pour le service utilisateur
+  user_service_webserver:
+    image: nginx:alpine
+    container_name: user-service-webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80" # Expose le service utilisateur sur le port 8000 de votre machine
+    volumes:
+      - ./user-microservice/:/var/www
+      - ./user-microservice/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - microservices_network
+    depends_on:
+      - user_service_app
+
+  # =================================================================
+  # MICROSERVICE 2 : SEND EMAIL SERVICE
+  # =================================================================
+
+  # Conteneur PHP-FPM pour le service d'envoi d'e-mails
+  send_email_service_app:
+    build:
+      context: ./sendEmailService # Chemin vers le contexte de build
+      dockerfile: Dockerfile
+    image: send-email-service
+    container_name: send-email-service-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./sendEmailService/:/var/www
+      # Vous pouvez aussi avoir une configuration PHP spécifique pour ce service
+      # - ./sendEmailService/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - microservices_network
+    depends_on:
+      - rabbitmq # Ce service dépend probablement de RabbitMQ pour recevoir des messages
+
+  # Conteneur Nginx pour le service d'envoi d'e-mails
+  send_email_service_webserver:
+    image: nginx:alpine
+    container_name: send-email-service-webserver
+    restart: unless-stopped
+    ports:
+      - "8001:80" # Expose ce service sur un port différent pour éviter les conflits
+    volumes:
+      - ./sendEmailService/:/var/www
+      - ./sendEmailService/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - microservices_network
+    depends_on:
+      - send_email_service_app
+
+  # =================================================================
+  # SERVICES PARTAGÉS (INFRASTRUCTURE)
+  # =================================================================
+
+  # Base de données (peut être partagée ou vous pouvez en créer une seconde)
+  db:
+    image: mysql:8.0
+    container_name: microservices-db # Nom plus générique
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: user_microservice
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: user
+      MYSQL_USER: user
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - microservices_network
+
+  # File d'attente de messages
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: microservices-rabbitmq # Nom plus générique
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    networks:
+      - microservices_network
