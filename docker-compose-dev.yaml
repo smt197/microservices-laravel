@@ -40,6 +40,23 @@ services:
     depends_on:
       - db
       - rabbitmq
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:Mxb7G//GzC9MYoJzjPg0pRNBGZXXLYTH6eZ1kbhFzzo=
+      - APP_URL=http://localhost:8080
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=user_microservice
+      - DB_USERNAME=user
+      - DB_PASSWORD=user
+      - QUEUE_CONNECTION=rabbitmq
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=admin
+      - RABBITMQ_VHOST=/
 
   # Conteneur Nginx pour le service utilisateur
   user_service_webserver:
@@ -47,7 +64,7 @@ services:
     container_name: user-service-webserver
     restart: unless-stopped
     ports:
-      - "8000:80" # Expose le service utilisateur sur le port 8000 de votre machine
+      - "8080:80" # Expose le service utilisateur sur le port 8000 de votre machine
     volumes:
       - ./user-microservice/:/var/www
       - ./user-microservice/nginx/conf.d/:/etc/nginx/conf.d/
@@ -77,6 +94,25 @@ services:
       - microservices_network
     depends_on:
       - rabbitmq # Ce service dépend probablement de RabbitMQ pour recevoir des messages
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:JeJcjYE9eJf61A2GRy8c4MuBwKAUUFlHQ3VcINXlLNY=
+      - APP_URL=http://localhost:8081
+      - QUEUE_CONNECTION=rabbitmq
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=admin
+      - RABBITMQ_VHOST=/
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailhog
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=noreply@sendmail.local
+      - MAIL_FROM_NAME=SendEmail Service
 
   # Conteneur Nginx pour le service d'envoi d'e-mails
   send_email_service_webserver:
@@ -84,7 +120,7 @@ services:
     container_name: send-email-service-webserver
     restart: unless-stopped
     ports:
-      - "8001:80" # Expose ce service sur un port différent pour éviter les conflits
+      - "8081:80" # Expose ce service sur un port différent pour éviter les conflits
     volumes:
       - ./sendEmailService/:/var/www
       - ./sendEmailService/nginx/conf.d/:/etc/nginx/conf.d/

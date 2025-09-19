@@ -31,6 +31,24 @@ services:
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
+      - APP_KEY=base64:JeJcjYE9eJf61A2GRy8c4MuBwKAUUFlHQ3VcINXlLNY=
+      - APP_URL=http://localhost:8081
+      - QUEUE_CONNECTION=rabbitmq
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=admin
+      - RABBITMQ_VHOST=/
+      - CACHE_DRIVER=file
+      - SESSION_DRIVER=file
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailhog
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=noreply@sendmail.local
+      - MAIL_FROM_NAME=SendEmail Service
 
   # Conteneur Nginx pour le service d'envoi d'e-mails
   send_email_webserver:
@@ -38,7 +56,7 @@ services:
     container_name: send-email-webserver
     restart: unless-stopped
     ports:
-      - "8001:80"
+      - "8081:80"
     volumes:
       - ./:/var/www
       - ./nginx/conf.d/:/etc/nginx/conf.d/
