@@ -33,9 +33,22 @@ class SendEmailJob implements ShouldQueue
     public function handle(): void
     {
         $data = $this->data;
-        Mail::raw($data['body'], function ($message) use ($data) {
-            $message->to($data['to'])
-                ->subject($data['subject']);
-        });
+
+        \Log::info('SendEmailJob started', ['data' => $data]);
+
+        try {
+            Mail::raw($data['body'], function ($message) use ($data) {
+                $message->to($data['to'])
+                    ->subject($data['subject']);
+            });
+
+            \Log::info('Email sent successfully', ['to' => $data['to']]);
+        } catch (\Exception $e) {
+            \Log::error('Email sending failed', [
+                'error' => $e->getMessage(),
+                'data' => $data
+            ]);
+            throw $e;
+        }
     }
 }

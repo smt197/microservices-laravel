@@ -237,5 +237,4 @@ class AuthController extends Controller
         // We will return a success response and let the frontend handle cookie deletion.
         return response()->json(['message' => 'Logout successful on server. Please clear the authentication cookie on the client-side.'], 200);
     }
-
 }

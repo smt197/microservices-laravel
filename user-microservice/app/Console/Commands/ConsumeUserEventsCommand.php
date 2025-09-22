@@ -18,10 +18,10 @@ class ConsumeUserEventsCommand extends Command
 
         try {
             $connection = new AMQPStreamConnection(
-                env('RABBITMQ_HOST', 'rabbitmq_server'),
+                env('RABBITMQ_HOST', 'rabbitmq.192.168.1.10.sslip.io'),
                 env('RABBITMQ_PORT', 5672),
-                env('RABBITMQ_USER', 'admin'),
-                env('RABBITMQ_PASSWORD', 'password'),
+                env('RABBITMQ_USER', 'jXRJrNVeNInyCjZY'),
+                env('RABBITMQ_PASSWORD', 'OP6rHtYgxpXpZpmBqfBi355ffAN0Av8m'),
                 env('RABBITMQ_VHOST', '/')
             );
 
@@ -48,8 +48,8 @@ class ConsumeUserEventsCommand extends Command
                         'event_type' => $eventData['event_type'] ?? 'unknown'
                     ]);
 
-                    // Dispatch to Laravel queue for processing
-                    ProcessUserEventJob::dispatch($eventData);
+                    // Dispatch to Laravel queue for processing (user service specific queue)
+                    ProcessUserEventJob::dispatch($eventData)->onQueue('user_events_processing');
 
                     // Acknowledge message
                     $msg->ack();

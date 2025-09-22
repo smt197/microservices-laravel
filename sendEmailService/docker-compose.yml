@@ -41,7 +41,7 @@ services:
       - CACHE_DRIVER=file
       - SESSION_DRIVER=file
       - MAIL_MAILER=smtp
-      - MAIL_HOST=mailhog
+      - MAIL_HOST=mailpit
       - MAIL_PORT=1025
       - MAIL_USERNAME=null
       - MAIL_PASSWORD=null
@@ -67,4 +67,16 @@ services:
   # =================================================================
   # INFRASTRUCTURE SERVICES
   # =================================================================
+
+  # MailPit pour capturer les emails en développement
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # Interface Web
+      - "1025:1025"   # SMTP
+    networks:
+      - send_email_network
+      - microservices_network
 
