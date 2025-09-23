@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\UserProfile;
 use Orion\Http\Controllers\Controller;
+use Orion\Concerns\DisableAuthorization;
 
 class UserProfileController extends Controller
 {
+    use DisableAuthorization;
+
     protected $model = UserProfile::class;
 
     public function filterableBy(): array

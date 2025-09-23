@@ -13,17 +13,18 @@ return new class extends Migration
     {
         Schema::create('user_profiles', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('auth_user_id')->unique();
-            $table->string('name');
-            $table->string('email');
-            $table->timestamp('email_verified_at')->nullable();
+            $table->unsignedBigInteger('auth_user_id')->unique()->comment('Reference to authentificationService user ID');
+
+            // Champs étendus spécifiques au profil uniquement
             $table->text('bio')->nullable();
             $table->string('avatar')->nullable();
             $table->string('phone')->nullable();
             $table->text('address')->nullable();
             $table->json('preferences')->nullable();
+
             $table->timestamps();
 
+            // Index pour performance
             $table->index('auth_user_id');
         });
 

@@ -48,7 +48,6 @@ class ProcessUserEventJob implements ShouldQueue
                 default:
                     Log::info('Unhandled user event type', ['event_type' => $eventType]);
             }
-
         } catch (\Exception $e) {
             Log::error('Failed to process user event', [
                 'error' => $e->getMessage(),
@@ -60,12 +59,11 @@ class ProcessUserEventJob implements ShouldQueue
 
     private function handleUserCreated(array $userData)
     {
+        // 2. Create UserProfile with reference to auth service
         $userProfile = UserProfile::updateOrCreate(
             ['auth_user_id' => $userData['id']],
             [
-                'name' => $userData['name'],
-                'email' => $userData['email'],
-                'email_verified_at' => $userData['email_verified_at'] ?? null,
+                // Only profile-specific fields, no user data duplication
             ]
         );
 
@@ -77,35 +75,21 @@ class ProcessUserEventJob implements ShouldQueue
 
     private function handleUserUpdated(array $userData)
     {
-        $userProfile = UserProfile::where('auth_user_id', $userData['id'])->first();
+        // UserProfile doesn't need update for basic user data
+        // Only profile-specific updates would be needed here
 
-        if ($userProfile) {
-            $userProfile->update([
-                'name' => $userData['name'],
-                'email' => $userData['email'],
-                'email_verified_at' => $userData['email_verified_at'] ?? null,
-            ]);
-
-            Log::info('User profile updated from auth event', [
-                'auth_user_id' => $userData['id'],
-                'profile_id' => $userProfile->id
-            ]);
-        }
+        Log::info('User updated event received (no action needed)', [
+            'auth_user_id' => $userData['id']
+        ]);
     }
 
     private function handleUserVerified(array $userData)
     {
-        $userProfile = UserProfile::where('auth_user_id', $userData['id'])->first();
+        // User verification stays in authentificationService
+        // No local action needed
 
-        if ($userProfile) {
-            $userProfile->update([
-                'email_verified_at' => $userData['email_verified_at'],
-            ]);
-
-            Log::info('User profile verification updated from auth event', [
-                'auth_user_id' => $userData['id'],
-                'profile_id' => $userProfile->id
-            ]);
-        }
+        Log::info('User verified event received (no action needed)', [
+            'auth_user_id' => $userData['id']
+        ]);
     }
 }

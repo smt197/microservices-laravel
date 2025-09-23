@@ -12,11 +12,8 @@ class UserProfile extends Model
     protected $table = 'user_profiles';
 
     protected $fillable = [
-        'auth_user_id',
-        'name',
-        'email',
-        'email_verified_at',
-        'bio',
+        'auth_user_id',      // Référence vers authentificationService
+        'bio',               // Champs étendus uniquement
         'avatar',
         'phone',
         'address',
@@ -24,7 +21,7 @@ class UserProfile extends Model
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'preferences' => 'array',
     ];
+
 }
