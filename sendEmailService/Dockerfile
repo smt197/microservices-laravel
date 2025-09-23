@@ -1,38 +1,37 @@
-FROM php:8.2-fpm-alpine
-
-# Install system dependencies
-RUN apk add --no-cache \
-    git \
-    curl \
-    libpng-dev \
-    oniguruma-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    supervisor \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
-
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Create system user to run Composer and Artisan Commands
-RUN adduser -G www-data -s /bin/sh -D www-data
-
-# Set working directory
+# --- 1. Stage 'base' ---
+# Contient les dépendances PHP nécessaires pour tous les stages
+FROM php:8.2-fpm-alpine as base
+# On ajoute supervisor et nginx à l'image de base
+RUN apk add --no-cache supervisor nginx
 WORKDIR /var/www
 
-# Copy existing application directory contents
-COPY . /var/www
+# --- 2. Stage 'vendor' ---
+# Installe les dépendances Composer
+FROM base as vendor
+RUN apk add --no-cache git curl unzip
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY database/ composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --optimize-autoloader
 
-# Copy existing application directory permissions
-COPY --chown=www-data:www-data . /var/www
+# --- 3. Stage 'app' (Image finale) ---
+FROM base as app
+# Installer uniquement les extensions PHP requises pour l'exécution
+RUN apk add --no-cache libpng-dev oniguruma-dev libxml2-dev \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Copier les dépendances depuis le stage 'vendor'
+COPY --from=vendor /var/www/vendor/ ./vendor/
+# Copier le code de l'application
+COPY . .
 
-# Change current user to www-data
-USER www-data
+# Copier les fichiers de configuration pour Nginx et Supervisor
+COPY nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
+COPY supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Expose port 9000 and start php-fpm server
-EXPOSE 9000
-CMD ["php-fpm"]
+# Définir les permissions
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+RUN chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+
+# Exposer le port 80 (Nginx) et lancer Supervisor
+EXPOSE 80
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

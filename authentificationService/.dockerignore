@@ -1,58 +1,15 @@
-# Ignore version control
 .git
 .gitignore
-
-# Ignore dependencies
+.env
+.env.example
+docker-compose.yml
+Dockerfile
+README.md
 /vendor
 /node_modules
-
-# Ignore environment files
-.env
-.env.*
-
-# Ignore build artifacts
 /public/build
-/public/hot
-/public/storage
-/storage/*.key
-
-# Ignore cache and logs
-/bootstrap/cache/*.php
-/storage/app/*
-/storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
-/storage/logs/*
-
-# Ignore test files
-/tests
-phpunit.xml
-.phpunit.result.cache
-
-# Ignore IDE files
-.vscode
-.idea
-*.swp
-*.swo
-
-# Ignore documentation
-README.md
-*.md
-
-# Ignore Docker files
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# Ignore package files
-package-lock.json
+/storage/framework/cache/data/*
+/storage/logs/*.log
 npm-debug.log
-yarn-error.log
-
-# Ignore OS files
-.DS_Store
-Thumbs.db
-
-# Ignore temp files
-*.tmp
-*.temp
